@@ -196,10 +196,8 @@ module Railsdav
          begin
           dest_uri = get_destination_uri
           dest_path = get_dest_path
-	  #Bad Gateway it if the servers arnt the same
-          #request.host_with_port does not work well as a test
-          #since it will leave off :80 if it's a 'normal' http request
-          raise WebDavErrors::BadGatewayError unless "#{request.host}:#{request.port}" == "#{dest_uri.host}:#{dest_uri.port}"
+          #Bad Gateway it if the servers arnt the same
+          raise WebDavErrors::BadGatewayError unless request.host_with_port == "#{dest_uri.host}:#{dest_uri.port}"
          rescue URI::InvalidURIError
           raise WebDavErrors::BadGatewayError
          end
@@ -223,10 +221,8 @@ module Railsdav
               begin
                dest_uri = get_destination_uri
                dest_path = get_dest_path
-	       #Bad Gateway it if the servers arnt the same
-               #request.host_with_port does not work well as a test
-               #since it will leave off :80 if it's a 'normal' http request
-               raise WebDavErrors::BadGatewayError unless "#{request.host}:#{request.port}" == "#{dest_uri.host}:#{dest_uri.port}"
+               #Bad Gateway it if the servers arnt the same
+               raise WebDavErrors::BadGatewayError unless request.host_with_port == "#{dest_uri.host}:#{dest_uri.port}"
               rescue URI::InvalidURIError
                raise WebDavErrors::BadGatewayError
               end
