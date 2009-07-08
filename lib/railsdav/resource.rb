@@ -39,7 +39,7 @@ module WebDavResource
   end
 
   def get_href
-    URI.escape(self.href).gsub(/\+/, '%20') unless self.href.nil?
+    URI.unescape(self.href).gsub(/\+/, '%20') unless self.href.nil?
   end
 
   def get_properties
