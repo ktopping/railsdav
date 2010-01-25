@@ -1,6 +1,8 @@
 Railsdav (WebDAV for Ruby On Rails)
 ===================================
 
+Important note: This interim commit is in no way release-quality. It mainly exists in order for me to test that I have git installed correctly! Kieran
+
 Railsdav is a plugin which allows for custom WebDAV controllers to be added to a Ruby On Rails application to expose functionality as filesystems to WebDAV clients such as Mac OS X Finder, Windows Network Places, Dreamweaver etc.
 
 Railsdav requires the following gems in addition to rails
