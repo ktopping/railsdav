@@ -3,27 +3,71 @@
 module Railsdav
   
   module PropXMLMethods
-        
+
+    # The code I copied from here:
+    #   http://blog.smartlogicsolutions.com/2008/07/01/microsoft-webdav-opens-document-as-read-only-when-using-railsdav/
+    # mistakenly had 
+    #  xml.D(:multistatus, {"xmlns:D" => "DAV:"}) do
+    # instead of:
+    #  xml.D(:prop, {"xmlns:D" => "DAV:"}) do
+def lock_xml
+<<EOLOCK_XML 
+         xml.D(:prop, {"xmlns:D" => "DAV:"}) do
+           xml.D :lockdiscovery do
+             xml.D :activelock do
+               xml.D :locktype do 
+                 xml.D @lock.type.to_sym
+               end
+               xml.D :lockscope do 
+                 xml.D @lock.scope.to_sym
+               end
+               xml.D :depth, @lock.depth
+               xml.D :timeout, @lock.timeout_full               
+               xml.D :locktoken do 
+                 xml.D :href, @lock.token
+               end               
+               xml.D :lockroot do 
+                 xml.D :href, @lock.href
+               end
+             end
+           end
+         end  
+EOLOCK_XML
+end    
+    
+    
         def propfind_xml
         <<EOPROPFIND_XML 
-         xml.D(:multistatus, {"xmlns:D" => "DAV:"}) do
-            @resources.each do |resource|
-               xml.D :response do
-                   xml.D :href, resource.get_href
-                   xml.D :propstat do
-                      xml.D :prop do
-          			         resource.get_properties.each do |property, value|
-                          xml.D(property, value)
-          			         end
-          			         xml.D :resourcetype do
-             				     xml.D :collection if resource.collection?
-             			     end
-                      end
-          			       xml.D :status, resource.status
-                   end
-                end
+  xml.D(:multistatus, {"xmlns:D" => "DAV:"}) do
+    @resources.each do |resource|
+      xml.D :response do
+        xml.D :href, resource.get_href
+        xml.D :propstat do
+          xml.D :prop do
+            resource.get_properties.each do |property, value|
+              xml.D(property, value)
             end
-         end  
+            xml.D :resourcetype do
+              xml.D :collection if resource.collection?
+            end
+             				     #kieran added this
+             				     xml.D :supportedlock do
+             				       xml.D :lockentry do
+             				         xml.D :lockscope do
+             				           xml.D :exclusive
+                             end
+             				         xml.D :locktype do
+             				           xml.D :write
+                             end
+                           end
+                         end
+             				     #<< kieran added this
+          end
+          xml.D :status, resource.status
+        end
+      end
+    end
+  end  
 EOPROPFIND_XML
         end
         def proppatch_xml
