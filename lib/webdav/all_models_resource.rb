@@ -2,7 +2,7 @@
 # Released under the MIT License.  See the LICENSE file for more details.
 
 require 'find'
-class ActiveRecordResource
+class AllModelsResource
   include WebDavResource
 
    attr_accessor :href, :record, :table
@@ -55,10 +55,10 @@ class ActiveRecordResource
      return [] unless collection?
 
      #If we have a table then return the children as all the records
-     return table.find( :all ).map { |o| ActiveRecordResource.new(o,"#{href}#{o.id.to_s}.yaml") } unless table.nil?
+     return table.find( :all ).map { |o| AllModelsResource.new(o,"#{href}#{o.id.to_s}.yaml") } unless table.nil?
      
      #The root case return the list of the tables
-     return @@classes.keys.sort.map { |o| ActiveRecordResource.new(o,"#{href}#{o}") } if table.nil? and record.nil?
+     return @@classes.keys.sort.map { |o| AllModelsResource.new(o,"#{href}#{o}") } if table.nil? and record.nil?
 
     end
   
