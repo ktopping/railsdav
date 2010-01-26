@@ -8,7 +8,8 @@ Railsdav is a plugin which allows for custom WebDAV controllers to be added to a
 Railsdav requires the following gems in addition to rails
 
 * unicode (gem install unicode)
-* mimetypes (gem install mime-types)
+* shared-mime-info
+# mimetypes (gem install mime-types)
 
 Railsdav was created by Stuart Eccles (http://www.liverail.net/). I'd like to thank the following people for assisting with Railsdav
 
