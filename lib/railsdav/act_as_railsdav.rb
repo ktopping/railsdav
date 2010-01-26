@@ -27,36 +27,36 @@
 require 'action_controller'
 module Railsdav
   
-  #TODO: Put this somewhere else!
-  class FilesystemLockFactory
+  class Lock
     
-    class Lock
-      attr_accessor :type, :scope, :timeout, :depth, :timeout_units, :href, :token
- 
-      def initialize(args)      
-        @type    = args[:type]
-        @scope   = args[:scope]
-        @timeout = args[:timeout]
-        @href    = args[:href]  
-        @depth   = 'Infinity'
-        @timeout_units = 'Second'
-        @token   = build_token(args[:id])
-      end
- 
-      def timeout_full
-        "#{self.timeout_units}-#{self.timeout}"
-      end
- 
-      protected
-      def build_token(text)
-        require 'digest/md5'
-        md5 = Digest::MD5.hexdigest(text.to_s).to_s
-        'opaquelocktoken:'+md5[0,7]+'-'+md5[8,11]+'-'+md5[12,15]+'-'+md5[16,19]+'-'+md5[20,31]
-      end
+    attr_accessor :type, :scope, :timeout, :depth, :timeout_units, :href, :token
+
+    def initialize(args)      
+      @type    = args[:type]
+      @scope   = args[:scope]
+      @timeout = args[:timeout]
+      @href    = args[:href]  
+      @depth   = 'Infinity'
+      @timeout_units = 'Second'
+      @token   = build_token(args[:id])
     end
 
+    def timeout_full
+      "#{self.timeout_units}-#{self.timeout}"
+    end
+
+    protected
+    def build_token(text)
+      require 'digest/md5'
+      md5 = Digest::MD5.hexdigest(text.to_s).to_s
+      'opaquelocktoken:'+md5[0,7]+'-'+md5[8,11]+'-'+md5[12,15]+'-'+md5[16,19]+'-'+md5[20,31]
+    end
+  end
+
+  #TODO: Put this somewhere else!
+  class FilesystemLockFactory
     def lock(path)
-      puts "Trying to LOCK " + path
+      Rails.logger.debug "Trying to LOCK " + path
       lockfile = lockfile_path path
       if File.exists? lockfile
         # actually, we should check if it has timed-out
@@ -80,7 +80,7 @@ module Railsdav
     end
     
     def unlock(path, token)
-      puts "Trying to UNLOCK " + path
+      Rails.logger.debug "Trying to UNLOCK " + path
       lockfile = lockfile_path path
       if !File.exists? lockfile
         false
@@ -88,19 +88,19 @@ module Railsdav
         File.open lockfile, "r" do |f|
           if f.flock(File::LOCK_EX | File::LOCK_NB)
             stored_token = f.read
-            puts "Tokens: " + stored_token + " == " + token + " ?"
+            Rails.logger.debug "Tokens: " + stored_token + " == " + token + " ?"
             if (stored_token == token) then
               # actually, the above returns 0 on success, but this is "true" according to ruby
               # TODO: check that the lock token matches
-              puts "Deleting " + lockfile
+              Rails.logger.debug "Deleting " + lockfile
               File.delete lockfile
               true
             else
-              puts "Tokens not equal!"
+              Rails.logger.debug "Tokens not equal!"
               false
             end
           else
-            puts "Cannot lock " + lockfile
+            Rails.logger.debug "Cannot lock " + lockfile
             false
           end
         end
@@ -116,11 +116,57 @@ module Railsdav
     private
     def lockfile_path(path)
       ret = File.join(@lockRoot, path.gsub(/\//, "_"))
-      puts "lockfile_path =" + ret
+      Rails.logger.debug "lockfile_path =" + ret
       ret
     end
     
   end
+
+  #TODO: Put this somewhere else!
+  class ActiveRecordLockFactory
+    
+    def lock(path)
+      Rails.logger.debug "ActiveRecordLockFactory. Trying to LOCK " + path
+      ar = @ar_class.find_by_path path
+      if ar
+        # actually, we should check if it has timed-out
+        false
+      else
+        ar = @ar_class.new({:path => path})
+        ar.save!
+        loc = Lock.new({:type => 'write', :scope => 'exclusive', :timeout => 60*60*5, :href => path, :id => ar.id})
+        ar.token = loc.token
+        ar.save!
+        loc
+      end
+    end
+    
+    def unlock(path, token)
+      Rails.logger.debug "ActiveRecordLockFactory. Trying to UNLOCK " + path
+      ar = @ar_class.find_by_path path
+      if !ar
+        Rails.logger.debug "Cannot find lock!"
+        false
+      else
+        if ar.token == token
+          Rails.logger.debug "Deleting " + ar.to_s
+          ar.delete
+          true
+        else
+          Rails.logger.debug "Tokens not equal!"
+          false
+        end
+      end
+    end
+    
+    def initialize(class_name)
+      @ar_class = eval(class_name)
+    end
+    
+  end
+
+
+
   
     METHODS = %w(lock unlock options propfind proppatch mkcol delete put copy move)
     VERSIONS = %w(1 2)
@@ -145,7 +191,11 @@ module Railsdav
         self.dav_versions = VERSIONS + options[:extra_dav_versions]
         
         class_inheritable_accessor :lock_factory
-        self.lock_factory = FilesystemLockFactory.new
+        if options[:lock_factory]
+          self.lock_factory = options[:lock_factory]
+        else
+          self.lock_factory = FileSystemLockFactory.new
+        end
         
         class_eval do 
           extend Railsdav::PropXMLMethods
@@ -198,17 +248,17 @@ module Railsdav
     end
     
     def webdav_lock()
-       puts("Got here ONE!")
-       @lock = get_lock(@path_info)
-       if @lock
-         response.headers["Lock-Token"] = "<#{@lock.token}>"
-         response.headers["Content-Type"] = 'text/xml; charset="utf-8"'
-         puts("Got here!")
-         logger.debug(render_to_string :inline => self.class.lock_xml, :layout => false, :type => :rxml, :status => 200)
-         render :inline => self.class.lock_xml, :layout => false, :type => :rxml, :status => 200  and return
-       else
-         render  :nothing => true, :status => WebDavErrors::ForbiddenError and return
-       end
+      logger.debug "Got here ONE!"
+      @lock = get_lock(@path_info)
+      if @lock
+        response.headers["Lock-Token"] = "<#{@lock.token}>"
+        response.headers["Content-Type"] = 'text/xml; charset="utf-8"'
+        logger.debug "Got here!"
+        logger.debug(render_to_string :inline => self.class.lock_xml, :layout => false, :type => :rxml, :status => 200)
+        render :inline => self.class.lock_xml, :layout => false, :type => :rxml, :status => 200  and return
+      else
+        render  :nothing => true, :status => WebDavErrors::ForbiddenError and return
+      end
     end
     
 =begin
@@ -225,7 +275,7 @@ module Railsdav
         # @resource = get_resource_for_path(@path_info)
         # lock = lock_factory.unlock(@resource)
         lock_token = request.headers["Lock-Token"].gsub(/(^<)|(>$)/, "")
-        puts "lock_token=" + lock_token
+        logger.debug "lock_token=" + lock_token
         lock = lock_factory.unlock(@path_info, lock_token)
         # 204="No content"
         render :nothing => true, :status => 204 and return
@@ -254,7 +304,7 @@ module Railsdav
         response.headers["Content-Type"] = 'text/xml; charset="utf-8"'
         
         #render the Multistatus XML
-        puts(render_to_string :inline => self.class.propfind_xml, :layout => false, :type => :rxml, :status => 207)
+        logger.debug(render_to_string :inline => self.class.propfind_xml, :layout => false, :type => :rxml, :status => 207)
         render :inline => self.class.propfind_xml, :layout => false, :type => :rxml, :status => 207  and return
       end
   

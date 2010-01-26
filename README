@@ -16,4 +16,21 @@ Railsdav was created by Stuart Eccles (http://www.liverail.net/). I'd like to th
 *   Alex MacCaw
 *   Fabien Franzen
 
+Storage model
+ create_table :webdavs do |t|
+    t.string   :path
+    t.binary   :data
+    t.integer  :size, :null => false
+    t.boolean  :is_directory, :null => false
+    t.timestamps
+ end
+
+ add_index :webdavs, [:path], :unique => true
+Lock model
+ create_table :webdav_locks do |t|
+    t.string   :path
+    t.string   :token
+    t.timestamps
+ end
+ add_index :webdav_locks, [:path], :unique => true
 
