@@ -5,10 +5,19 @@ Important note: This interim commit is in no way release-quality. It mainly exis
 
 Railsdav is a plugin which allows for custom WebDAV controllers to be added to a Ruby On Rails application to expose functionality as filesystems to WebDAV clients such as Mac OS X Finder, Windows Network Places, Dreamweaver etc.
 
+ktopping's enhancements include:
+ * Locking - there is a partially complete framework for acquiring/releasing locks, allowing applications to specify their own "Lock Factory" for creating, checking & releasing locks. Two example implementations exist:
+    * ActiveRecordLockFactory: Implements locks via an ActiveRecord class. See example class below, "WebdavLock".
+    * FileSystemLockFactory: Implements locks via native filesystem locks.
+   The locking implementation allows a wider number of clients to connect to the webdav server, and it allows them to perform a greater set of functionality.
+ * ActiveRecord webdav implementation. Addition of an "acts_as_active_record_webdav" method which stores resources in a database table of your choice, via an ActiveRecord class of your choice.
+
+Storing resources via ActiveRecord, and implementing locks via ActiveRecord means that this plugin can run on platforms without a writable filesystem. One obvious example being Heroku.
+
 Railsdav requires the following gems in addition to rails
 
 * unicode (gem install unicode)
-* shared-mime-info
+* shared-mime-info (gem install unicode)
 # mimetypes (gem install mime-types)
 
 Railsdav was created by Stuart Eccles (http://www.liverail.net/). I'd like to thank the following people for assisting with Railsdav
@@ -17,7 +26,9 @@ Railsdav was created by Stuart Eccles (http://www.liverail.net/). I'd like to th
 *   Alex MacCaw
 *   Fabien Franzen
 
-Storage model
+TODO: Document this!
+Resource storage model:
+
  create_table :webdavs do |t|
     t.string   :path
     t.binary   :data
@@ -27,7 +38,9 @@ Storage model
  end
 
  add_index :webdavs, [:path], :unique => true
+
 Lock model
+
  create_table :webdav_locks do |t|
     t.string   :path
     t.string   :token
